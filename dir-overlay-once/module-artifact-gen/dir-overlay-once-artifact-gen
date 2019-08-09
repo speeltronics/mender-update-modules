@@ -9,8 +9,10 @@ Simple tool to generate Mender Artifact suitable for dir-overlay Update Module
 
 Usage: $0 [options] file-tree [-- [options-for-mender-artifact] ]
 
-    Options: [ -n|artifact-name -t|--device-type -d|--dest-dir -o|--output_path -h|--help ]
+    Options: [ --compression -n|--artifact-name -t|--device-type -d|--dest-dir -o|--output_path -h|--help ]
 
+        --compression value - Compression to use for data and header inside the artifact, currently supports: none, gzip, lzma. (default: "gzip").
+                              NOTE: Compression cannot be passed into [options-for-mender-artifact] and must be passed here.
         --artifact-name     - Artifact name
         --device-type       - Target device type identification
         --dest-dir          - Target destination directory where to deploy the update (Defaults to "/")
@@ -18,7 +20,7 @@ Usage: $0 [options] file-tree [-- [options-for-mender-artifact] ]
         --help              - Show help and exit
         file-tree           - Directory tree to bundle in the update
 
-Anything after a '--' gets passed directly to the mender-artifact tool.
+Anything after a '--' gets passed directly to the mender-artifact tool except for --compression.
 
 Common use-case for the dir-overlay is to install files overlayed
 on the root file-system.
@@ -62,6 +64,7 @@ manifest_file="manifest"
 file_tree=""
 passthrough=0
 passthrough_args=""
+compression=""
 
 while (( "$#" )); do
   if test $passthrough -eq 1
@@ -71,6 +74,13 @@ while (( "$#" )); do
     continue
   fi
   case "$1" in
+    --compression)
+      if [ -z "$2" ]; then
+        show_help_and_exit_error
+      fi
+      compression="$1 $2"
+      shift 2
+      ;;
     --device-type | -t)
       if [ -z "$2" ]; then
         show_help_and_exit_error
@@ -159,7 +169,7 @@ find $file_tree -type f | sed "s|^$file_tree/||" > $manifest_file
 # Create dest_dir file in plain text
 echo "$dest_dir" > $dest_dir_file
 
-mender-artifact write module-image \
+mender-artifact $compression write module-image \
   -T dir-overlay-once \
   -t $device_type \
   -o $output_path \
