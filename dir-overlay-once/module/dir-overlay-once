@@ -19,7 +19,16 @@ prev_files_tar="$state_dir/backup.tar"
 
 # Summary of module implementation
 #
-# NOTE! This module stores state in /var/lib/mender
+# Based off of dir-overlay module. This module works similar to dir-overlay, 
+# but after a successful deployment, it will not look at the previous deployment.
+# Deployments are considered to be one-time deployments. The deployment will only be rolled back if it fails.
+# Multiple different deployments can be deployed independent of each other. Optionally, deployments can require 
+# a previous artifact to have been deployed before the current artifact will be deployed.
+# TODO - Implement this feature.
+# TODO - Implement saving each deployed ARTIFACT_NAME and only optionally only allowing deployments if 
+# a previous artifact has already been deployed.
+#
+# NOTE! This module stores state in /var/lib/mender 
 #
 # In ArtifactInstall state:
 #
