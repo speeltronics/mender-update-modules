@@ -2,7 +2,7 @@
 
 set -e
 
-show_help() {
+show_help() { 
   cat << EOF
 
 Simple tool to generate Mender Artifact suitable for dir-overlay Update Module
