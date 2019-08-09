@@ -12,8 +12,7 @@ manifest_file_from_deployment="$FILES"/files/manifest
 update_files_tar="$FILES"/files/update.tar
 
 
-state_dir="/var/lib/mender/dir-overlay-install"
-manifest_file="$state_dir/manifest"
+state_dir="/var/lib/mender/dir-overlay-once-install"
 manifest_file_prev="$state_dir/manifest.prev"
 prev_files_tar="$state_dir/backup.tar"
 
@@ -71,39 +70,87 @@ case "$STATE" in
     ;;
 
     ArtifactInstall)
+
+        echo "EVAN DEBUG - Installing!!!!!!"
+
         dest_dir=$(cat $dest_dir_file)
         mkdir -p $dest_dir $state_dir
 
-        if [ -e $manifest_file ]; then
+        # process deployment manifest - backup and remove deployment files if they already exist
+        if [ -e $manifest_file_from_deployment ]; then
+            # create backup directory
             mkdir -p $backup_dir
-            for file in $(cat $manifest_file); do
-                cp $dest_dir/$file $backup_dir/
+            # loop through the manifest and copy any currently existing files to the backup dir
+            for file in $(cat $manifest_file_from_deployment); do
+                if [ -e $dest_dir/$file ]; then
+                    cp $dest_dir/$file $backup_dir/
+                fi
             done
+            # tar the backup directory
             tar -cf ${prev_files_tar} -C ${backup_dir} .
 
-            for file in $(cat $manifest_file); do
-                rm $dest_dir/$file
+            # set the deployment manifest to previous manifest in case we need to roll back from a failure
+            # do this after tarring so we know on a rolback all the files have been backed up
+            mv $manifest_file_from_deployment $manifest_file_prev
+
+            # remove any current files being updated if they already exist
+            # if there is a failure or power off during this process, we already have the 
+            # files backed up so they can be rolled back, if needed
+            for file in $(cat $manifest_file_from_deployment); do
+                if [ -e $dest_dir/$file ]; then
+                    rm $dest_dir/$file
+                fi
             done
-
-            mv $manifest_file $manifest_file_prev
+            
         fi
-
+        # create destination directory
         mkdir -p ${dest_dir}
+        # untar the deployment tar file to the destination directory
         tar -xf ${update_files_tar} -C ${dest_dir}
+        # sync the filesytem
         sync
         ;;
 
     ArtifactCommit)
-        mv $manifest_file_from_deployment $manifest_file
+        echo "EVAN DEBUG - Committing!!!!!!"
+
+        # if here then files should already be deployed, remove the previous manifest and backup tar file, the update succeeded
+        
+        # remove the previous manifest
+        rm $manifest_file_prev
+        
+        # remove the $prev_files_tar
+        rm $prev_files_tar
+
         ;;
 
     ArtifactRollback)
+        echo "EVAN DEBUG - Rolling back!!!!!!"
+
+        # if here then we need to rollback
         dest_dir=$(cat $dest_dir_file)
 
+        # exit if the previous manifest does not exist, nothing should have been removed or updated
+        [[ -f $manifest_file_prev ]] || exit 0
+
+        # exit if the backup tar does not exist, this should exist if the previous manifest exists
         [[ -f $prev_files_tar ]] || exit 0
 
-        cp $manifest_file_prev $manifest_file
+        # untar the backup, this could potentially leave new updated files hanging around if the failure occurred while untarring the deployment!
         tar -xf ${prev_files_tar} -C ${dest_dir}
+
+        # remove the previous manifest
+        rm $manifest_file_prev
+
+        # remove the $prev_files_tar
+        rm $prev_files_tar
+
+        # sync the filesytem
+        sync
+        ;;
+
+    Cleanup)
+        echo "EVAN DEBUG - Cleaning up!!!!!!"
         ;;
 esac
 
